@@ -4,16 +4,11 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <sys/stat.h>
 
 #include <mpi.h>
 
 #include "../common/board.h"
 #include "../common/common.h"
-
-#include "../common/test.h"
 
 int * get_line_board(Board * board, int thread_idx, int num_threads)
 {
@@ -118,9 +113,6 @@ int main(int argc, char ** argv)
         thread_board = malloc(size * m * sizeof(int));
         MPI_Recv(thread_board, size * m, MPI_INT, 0, 50004, MPI_COMM_WORLD, NULL);
     }
-    //~ printf("%d %ld %ld %ld %d\n", thread_idx, n, m, k, size);
-    
-    //~ printf("%d ready\n", thread_idx);
     
     int * top = malloc(m * sizeof(int));
     int * bottom = malloc(m * sizeof(int));
@@ -169,7 +161,6 @@ int main(int argc, char ** argv)
             disp_r[i] = last;
             count_r[i] = get_size(n, i, num_threads) * m;
             last += count_r[i];
-            printf("%d %d %d\n", i, disp_r[i], count_r[i]);
         }
     }
     
