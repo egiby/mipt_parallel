@@ -68,7 +68,7 @@ int main(int argc, char ** argv)
     // reading
     if (thread_idx == 0)
     {
-        FILE * file = fopen("board", "r");
+        FILE * file = fopen(argv[1], "r");
         fscanf(file, "%ld %ld %ld\n", &n, &m, &k);
         
         Board * board = get_board(n, m);

@@ -10,9 +10,14 @@
 #include "../common/test.h"
 #include "../common/common.h"
 
-int main()
+int main(int argc, char ** argv)
 {
-    FILE * file = fopen("../oscillator", "r");
+    if (argc != 2)
+    {
+        fprintf(stderr, "It must be only board's filename\n");
+        return 0;
+    }
+    FILE * file = fopen(argv[1], "r");
     
     int n, m, k;
     char is_reversed = 0;
