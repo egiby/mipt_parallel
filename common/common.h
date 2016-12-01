@@ -60,4 +60,15 @@ int get_life_value(int cnt, int old_value)
     return 0;
 }
 
+int int_get_element(int id, int n, int * arr)
+{
+    return arr[(id + n) % n];
+}
+
+void int_arr_copy(int * dest, int * src, int n)
+{
+    for (int i = 0; i < n; ++i)
+        dest[i] = src[i];
+}
+
 #endif

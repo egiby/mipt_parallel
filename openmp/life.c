@@ -12,12 +12,13 @@
 
 int main(int argc, char ** argv)
 {
-    if (argc != 2)
+    if (argc != 3)
     {
-        fprintf(stderr, "It must be only board's filename\n");
+        fprintf(stderr, "It must be board's filename and number of threads\n");
         return 0;
     }
     FILE * file = fopen(argv[1], "r");
+    int num_threads = atoi(argv[2]);
     
     int n, m, k;
     char is_reversed = 0;
@@ -35,7 +36,7 @@ int main(int argc, char ** argv)
     
     Board * new_board = get_board(n, m);
     for (int i = 0; i < k; ++i)
-#pragma omp parallel shared(board, new_board, n, m)
+#pragma omp parallel num_threads(num_threads) shared(board, new_board, n, m)
     {
     #pragma omp barrier
         int left = calc_left(n, omp_get_thread_num(), omp_get_num_threads());

@@ -19,12 +19,12 @@ typedef struct Board
 
 Board * get_board(int n, int m)
 {
-    Board * board = malloc(sizeof(Board));
+    Board * board = (Board*)malloc(sizeof(Board));
     board->N = n;
     board->M = m;
-    board->board = malloc(n * sizeof(int*));
+    board->board = (int**)malloc(n * sizeof(int*));
     for (int i = 0; i < n; ++i)
-        board->board[i] = malloc(m * sizeof(int));
+        board->board[i] = (int*)malloc(m * sizeof(int));
     
     return board;
 }
@@ -62,9 +62,9 @@ void delete_board(Board *);
 
 void reverse_board(Board * board)
 {
-    int ** new_board = malloc(board->M * sizeof(int*));
+    int ** new_board = (int**)malloc(board->M * sizeof(int*));
     for (int i = 0; i < board->M; ++i)
-        new_board[i] = malloc(board->N * sizeof(int));
+        new_board[i] = (int*)malloc(board->N * sizeof(int));
     
     for (int x = 0; x < board->N; ++x)
         for (int y = 0; y < board->M; ++y)
@@ -81,6 +81,16 @@ void delete_board(Board * board)
     for (int i = 0; i < board->N; ++i)
         free(board->board[i]);
     free(board->board);
+}
+
+
+int get_life_value_by_board(int x, int y, Board * board)
+{
+    int cnt = 0;
+    for (int i = 0; i < 8; ++i)
+        cnt += get_elem(board, x + dx[i], y + dy[i]);
+    
+    return get_life_value(cnt, get_elem(board, x, y));
 }
 
 #endif
