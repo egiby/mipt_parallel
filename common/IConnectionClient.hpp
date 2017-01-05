@@ -20,6 +20,10 @@ public:
     virtual IRequest * async_send(int * buf, int size, int thread_id, int tag) = 0;
     
     virtual void finalize() = 0;
+    
+    virtual ~IConnectionClient()
+    {
+    }
 };
 
 #endif

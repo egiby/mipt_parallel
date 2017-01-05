@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -123,7 +125,6 @@ public:
     }
 };
 
-
 void play(IConnectionClient * connection, int argc, char ** argv)
 {
     connection->init(argc, argv);
@@ -157,6 +158,7 @@ void play(IConnectionClient * connection, int argc, char ** argv)
         }
         
         size = get_size(n, thread_idx, num_threads);
+        std::cerr << "send board\n";
         for (int i = 1; i < num_threads; ++i)
         {
             int size_i = get_size(n, i, num_threads);
@@ -173,20 +175,27 @@ void play(IConnectionClient * connection, int argc, char ** argv)
         
         thread_board = get_line_board(board, 0, num_threads);
         
+        std::cerr << "board sended\n";
         print_board(board);
         
         delete_board(board);
     }
     else
     {
+        std::cerr << "recv board\n";
         connection->recv(&n, 1, 0, 50000);
         connection->recv(&m, 1, 0, 50001);
         connection->recv(&k, 1, 0, 50002);
         connection->recv(&size, 1, 0, 50003);
         
+        std::cerr << "ints recved\n";
+        
         thread_board = (int*)malloc(size * m * sizeof(int));
         connection->recv(thread_board, size * m, 0, 50004);
+        std::cerr << "board recved\n";
     }
+    
+    std::cerr << "calculating started\n";
     
     int * top = (int*)malloc(m * sizeof(int));
     int * bottom = (int*)malloc(m * sizeof(int));
@@ -219,12 +228,17 @@ void play(IConnectionClient * connection, int argc, char ** argv)
         swap_iters(&new_board, &thread_board);
     }
     
-    int * line_board = NULL;
-    int * count_r = NULL;
-    int * disp_r = NULL;
+    
+    // answering
+
+    connection->send(thread_board, size * m, 0, thread_idx + 100);
     
     if (thread_idx == 0)
     {
+        int * line_board = NULL;
+        int * count_r = NULL;
+        int * disp_r = NULL;
+    
         line_board = (int*)malloc(sizeof(int) * n * m);
         count_r = (int*)malloc(sizeof(int) * num_threads);
         disp_r = (int*)malloc(sizeof(int) * num_threads);
@@ -236,13 +250,12 @@ void play(IConnectionClient * connection, int argc, char ** argv)
             count_r[i] = get_size(n, i, num_threads) * m;
             last += count_r[i];
         }
-    }
-    
-    MPI_Gatherv(thread_board, size * m, MPI_INT, line_board, count_r, disp_r, 
-                MPI_INT, 0, MPI_COMM_WORLD);
-    
-    if (thread_idx == 0)
-    {
+        
+        for (int i = 0; i < num_threads; ++i)
+            connection->recv(line_board + disp_r[i], count_r[i], i, i + 100);
+
+        
+        // printing
         memcpy(line_board, thread_board, m * size * sizeof(int));
         Board * board = get_board_from_line(line_board, n, m);
         
