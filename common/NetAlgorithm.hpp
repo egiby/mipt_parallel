@@ -1,5 +1,7 @@
 #include <iostream>
 
+using std::cerr;
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -123,6 +125,11 @@ public:
         for (; cur_x < size - 1; ++cur_x)
             calculate_line(cur_x);
     }
+    
+    bool done()
+    {
+        return cur_x == size - 1 && is_top_calculated && is_bottom_calculated;
+    }
 };
 
 void play(IConnectionClient * connection, int argc, char ** argv)
@@ -158,7 +165,7 @@ void play(IConnectionClient * connection, int argc, char ** argv)
         }
         
         size = get_size(n, thread_idx, num_threads);
-        std::cerr << "send board\n";
+        //~ std::cerr << "send board\n";
         for (int i = 1; i < num_threads; ++i)
         {
             int size_i = get_size(n, i, num_threads);
@@ -175,27 +182,36 @@ void play(IConnectionClient * connection, int argc, char ** argv)
         
         thread_board = get_line_board(board, 0, num_threads);
         
-        std::cerr << "board sended\n";
+        //~ std::cerr << "board sended\n";
         print_board(board);
         
         delete_board(board);
     }
     else
     {
-        std::cerr << "recv board\n";
+        //~ std::cerr << "recv board\n";
         connection->recv(&n, 1, 0, 50000);
         connection->recv(&m, 1, 0, 50001);
         connection->recv(&k, 1, 0, 50002);
         connection->recv(&size, 1, 0, 50003);
         
-        std::cerr << "ints recved\n";
+        //~ std::cerr << "ints recved\n";
         
         thread_board = (int*)malloc(size * m * sizeof(int));
         connection->recv(thread_board, size * m, 0, 50004);
-        std::cerr << "board recved\n";
+        //~ std::cerr << "board recved\n";
     }
     
-    std::cerr << "calculating started\n";
+    //~ for (int x = 0; x < size; ++x)
+    //~ {
+        //~ for (int y = 0; y < m; ++y)
+        //~ {
+            //~ std::cerr << thread_board[x * m + y];
+        //~ }
+        //~ std::cerr << '\n';
+    //~ }
+    
+    //~ std::cerr << "calculating started\n";
     
     int * top = (int*)malloc(m * sizeof(int));
     int * bottom = (int*)malloc(m * sizeof(int));
@@ -228,12 +244,24 @@ void play(IConnectionClient * connection, int argc, char ** argv)
         swap_iters(&new_board, &thread_board);
     }
     
-    
+    //~ std::cerr << "calculating ended\n";
     // answering
 
-    connection->send(thread_board, size * m, 0, thread_idx + 100);
+    //~ for (int x = 0; x < size; ++x)
+    //~ {
+        //~ for (int y = 0; y < m; ++y)
+        //~ {
+            //~ std::cerr << thread_board[x * m + y];
+        //~ }
+        //~ std::cerr << '\n';
+    //~ }
     
-    if (thread_idx == 0)
+    if (thread_idx != 0)
+    {
+        //~ std::cerr << thread_idx << " send\n";
+        connection->send(thread_board, size * m, 0, thread_idx + 25000);
+    }
+    else
     {
         int * line_board = NULL;
         int * count_r = NULL;
@@ -251,12 +279,15 @@ void play(IConnectionClient * connection, int argc, char ** argv)
             last += count_r[i];
         }
         
-        for (int i = 0; i < num_threads; ++i)
-            connection->recv(line_board + disp_r[i], count_r[i], i, i + 100);
-
+        for (int i = 1; i < num_threads; ++i)
+        {
+            //~ cerr << i << " recved\n";
+            connection->recv(line_board + disp_r[i], count_r[i], i, i + 25000);
+        }
         
+        memcpy(line_board, thread_board, size * m * sizeof(int));
         // printing
-        memcpy(line_board, thread_board, m * size * sizeof(int));
+        
         Board * board = get_board_from_line(line_board, n, m);
         
         if (is_reversed)
