@@ -48,24 +48,27 @@ int main(int argc, char ** argv)
                 perror("execl");
             return 0;
         }
-        pids[i] = pid;
+        else
+            pids[i] = pid;
     }
     
-    printf("what is happened?\n");
+    //~ printf("what is happened?\n");
     
     for (int i = 0; i < num_workers; ++i)
     {
-        printf("%d\n", i);
+        //~ printf("%d\n", i);
         int wstatus;
         do
         {
-            usleep(100);
             int w = waitpid(pids[i], &wstatus, 0);
-            if (w < 0) 
+            if (w < 0)
             {
-                perror("waitpid");
-                exit(EXIT_FAILURE);
+                //~ perror("waitpid");
+                errno = 0;
+                break;
             }
+            if (!WIFEXITED(wstatus))
+                usleep(100);
         } while (!WIFEXITED(wstatus));
     }
     

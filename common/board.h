@@ -52,8 +52,15 @@ void print_board(Board * board)
 
 int get_elem(Board * board, int x, int y)
 {
-    x = (x + board->N) % board->N;
-    y = (y + board->M) % board->M;
+    if (x < 0)
+        x += board->N;
+    if (x >= board->N)
+        x -= board->N;
+    
+    if (y < 0)
+        y += board->M;
+    if (y >= board->M)
+        y -= board->M;
     
     return board->board[x][y];
 }

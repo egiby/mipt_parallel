@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
+#include <sched.h>
 #include <fcntl.h>
 #include <semaphore.h>
 #include <sys/stat.h>
@@ -14,43 +15,81 @@
 int NUMBER_OF_STEPS = 0;
 int NUMBER_OF_THREADS = 1;
 
-void * recalc_part(void * args)
+void calc_line(int x, Board * board, Board * new_board)
 {
-    void ** argv = (void**)args;
+    for (int y = 0; y < board->M; ++y)
+        new_board->board[x][y] = get_life_value_by_board(x, y, board);
+}
+
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+
+void debug_print(const char * s)
+{
+    pthread_mutex_lock(&m);
+    fprintf(stderr, s);
+    pthread_mutex_unlock(&m);
+}
+
+void debug_int(int c)
+{
+    pthread_mutex_lock(&m);
+    fprintf(stderr, "%d", c);
+    pthread_mutex_unlock(&m);
+}
+
+void * recalc_part(void * arg)
+{
+    void ** argv = (void**)arg;
     Board * board = (Board*)argv[0];
-    Board * new_board = (Board*)argv[0];
+    Board * new_board = (Board*)argv[1];
     int id = *(int*)argv[2];
-    int n = board->N;
     int m = board->M;
     
     int l = calc_left(board->N, id, NUMBER_OF_THREADS);
     int r = calc_right(board->N, id, NUMBER_OF_THREADS);
     
     int * step_top = (int*)argv[3];
-    int * step_top_to_read = (int*)argv[4];
+    int * step_top_ready = (int*)argv[4];
     int * step_bottom = (int*)argv[5];
-    int * step_bottom_to_read = (int*)argv[6];
+    int * step_bottom_ready = (int*)argv[6];
     
-    //~ int * bottom = malloc(sizeof(int) * board->M);
-    //~ int * top = malloc(sizeof(int) * board->M);
-    
-    //~ int * old_top = malloc(sizeof(int) * board->M);
-    //~ int * old_bottom = malloc(sizeof(int) * board->M);
+    int top_thread = (id - 1 + NUMBER_OF_THREADS) % NUMBER_OF_THREADS;
+    int bottom_thread = (id + 1) % NUMBER_OF_THREADS;
     
     for (int k = 0; k < NUMBER_OF_STEPS; ++k)
     {
-        //~ int_arr_copy(old_top, board->board[l], m);
-        while (int_get_element(id - 1, n, step_bottom_to_read) < k)
-            pthread_yield();
+        while (step_bottom[top_thread] < k)
+            sched_yield();
         
-        for (int y = 0; y < m; ++y)
-        {
-            new_board[l][y] = ;
-        }
+        calc_line(l, board, new_board);
+        step_top_ready[id] = k + 1;
         
-        //~ step_top[id] = k + 1;
+        calc_line(l + 1, board, new_board);
         
-        //~ while (int_get_element(id - 1, n, step_bottom) < k)
+        while (step_top[bottom_thread] < k)
+            sched_yield();
+        
+        calc_line(r - 1, board, new_board);
+        step_bottom_ready[id] = k + 1;
+        
+        calc_line(r - 2, board, new_board);
+        
+        while (step_bottom_ready[top_thread] < k + 1)
+            sched_yield();
+        swap_iters(&new_board->board[l], &board->board[l]);
+        step_top[id] = k + 1;
+        
+        while (step_top_ready[bottom_thread] < k + 1)
+            sched_yield();
+        swap_iters(&(new_board->board[r - 1]), &(board->board[r - 1]));
+        step_bottom[id] = k + 1;
+        
+        for (int x = l + 2; x < r - 2; ++x)
+            for (int y = 0; y < m; ++y)
+                new_board->board[x][y] = get_life_value_by_board(x, y, board);
+        
+        for (int x = l + 1; x < r - 1; ++x)
+            swap_iters(&(new_board->board[x]), &(board->board[x]));
     }
     
     return NULL;
@@ -126,7 +165,6 @@ int main(int argc, char ** argv)
         swap_int(&n, &m);
     }
     
-    //~ new_board = get_board(n, m);
     NUMBER_OF_STEPS = k;
     
     play(board);

@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sched.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -76,11 +77,12 @@ const int RecvRequest::KB = 1024;
 class SendRequest: public IRequest
 {
     int tag;
+    int worker_id;
     SocketsConnectionClient * connection;
     
     SendRequest();
 public:
-    SendRequest(int, SocketsConnectionClient *);
+    SendRequest(int, int, SocketsConnectionClient *);
     
     bool test();
     void wait();
@@ -153,7 +155,7 @@ struct SocketsConnectionClient: public IConnectionClient
     std::mutex send_queue_m;
     std::condition_variable cv;
     
-    std::set<int> send_ready; // access for worker and for sender
+    std::set<std::pair<int, int> > send_ready; // access for worker and for sender
     std::mutex send_ready_m;
     
     void init(int argc, char ** argv)
@@ -178,9 +180,9 @@ struct SocketsConnectionClient: public IConnectionClient
         l_thread.detach();
         s_thread.detach();
         
-        sleep(2);
+        //~ usleep(2000);
         
-        printf("it started\n");
+        //~ printf("it started\n");
     }
     
     int get_num_threads()
@@ -209,26 +211,26 @@ struct SocketsConnectionClient: public IConnectionClient
     {
         assert(thread_id < num_workers);
         assert(thread_id >= 0);
-        RecvRequest * request = new RecvRequest(tag, (char*)buf, size, this);
+        RecvRequest * request = new RecvRequest(tag, (char*)buf, size * sizeof(int), this);
         return request;
     }
     
     IRequest * async_send(int * buf, int size, int thread_id, int tag)
     {
-        DataForSend * data = new DataForSend((char*)buf, size, thread_id, tag);
+        DataForSend * data = new DataForSend((char*)buf, size * sizeof(int), thread_id, tag);
         
         send_queue_m.lock();
         send_queue.push(data);
         send_queue_m.unlock();
         cv.notify_all();
         
-        SendRequest * request = new SendRequest(tag, this);
+        SendRequest * request = new SendRequest(tag, thread_id, this);
         return request;
     }
     
     void finalize()
     {
-        
+        sleep(4);
     }
 };
 
@@ -239,7 +241,7 @@ RecvRequest::RecvRequest(int tag, char * buf, int size, SocketsConnectionClient 
 : tag(tag), buf(buf), size(size), cur_size(0), connection(connection), ready_buf(0)
 {
 }
-    
+
 bool RecvRequest::test()
 {
     connection->recv_ready_m.lock();
@@ -266,11 +268,11 @@ bool RecvRequest::test()
     
     return 0;
 }
-    
+
 void RecvRequest::wait()
 {
     while (!test())
-        pthread_yield();
+        sched_yield();
 }
 
 RecvRequest::~RecvRequest()
@@ -295,7 +297,7 @@ void finalize_recv(ConnectionIn * input, SocketsConnectionClient * connection)
     connection->recv_ready[input->tag] = input->buf;
     connection->recv_ready_m.unlock();
     
-    fprintf(stderr, "recv %d finalized\n", input->tag);
+    //~ fprintf(stderr, "recv %d finalized\n", input->tag);
     input->clear();
 }
 
@@ -371,7 +373,7 @@ void listener(SocketsConnectionClient * connection)
     listener_addr.sin_addr.s_addr = inet_addr(connection->addr);
     listener_addr.sin_port = htons(connection->port + connection->worker_id);
     
-    printf("%d\n", connection->port + connection->worker_id);
+    //~ printf("%d\n", connection->port + connection->worker_id);
     
     int so_reuseaddr = 1;
 
@@ -401,11 +403,9 @@ void listener(SocketsConnectionClient * connection)
         
         for (int i = 0; i < num; ++i)
         {
-            //~ printf("smth happened %d\n", num);
-            //~ usleep(500);
             if (events[i].data.fd == listener_socket)
             {
-                printf("%d: client connected\n", connection->worker_id);
+                //~ fprintf(stderr, "%d: client connected\n", connection->worker_id);
                 int c_fd = accept(listener_socket, NULL, NULL);
                 check("accept", errno, 1);
                 
@@ -418,7 +418,7 @@ void listener(SocketsConnectionClient * connection)
             else
             {
                 disconnect_client(events[i].data.fd, e_fd, connection);
-                printf("client disconnected\n");
+                //~ fprintf(stderr, "client disconnected\n");
             }
         }
     }
@@ -430,22 +430,20 @@ SendRequest::SendRequest()
 {
 }
 
-SendRequest::SendRequest(int tag, SocketsConnectionClient * connection)
-: tag(tag), connection(connection)
+SendRequest::SendRequest(int tag, int worker_id, SocketsConnectionClient * connection)
+: tag(tag), worker_id(worker_id), connection(connection)
 {
 }
 
 bool SendRequest::test()
 {
-    return connection->send_ready.find(tag) != connection->send_ready.end();
+    return connection->send_ready.find(std::make_pair(tag, worker_id)) != connection->send_ready.end();
 }
 
 void SendRequest::wait()
 {
     while (!test())
-    {
-        pthread_yield();
-    }
+        sched_yield();
 }
 
 void init_connection(int worker_id, SocketsConnectionClient * connection)
@@ -457,9 +455,13 @@ void init_connection(int worker_id, SocketsConnectionClient * connection)
     addr.sin_addr.s_addr = inet_addr(connection->addr);
     addr.sin_port = htons(connection->port + worker_id);
     
-    connect(c_fd, (struct sockaddr*)(&addr), sizeof(sockaddr_in));
-    check("connect", errno, 1);
-    
+    while (1)
+    {
+        connect(c_fd, (struct sockaddr*)(&addr), sizeof(sockaddr_in));
+        if (check("connect", errno, 0))
+            break;
+        sched_yield();
+    }
     connection->out_connections[worker_id] = c_fd;
 }
 
@@ -513,7 +515,6 @@ void sender(SocketsConnectionClient * connection)
                 if (connection->send_queue.empty())
                     break;
                 
-                
                 data = connection->send_queue.front();
             }
             
@@ -529,7 +530,7 @@ void sender(SocketsConnectionClient * connection)
                 connection->send_queue_m.unlock();
                 
                 connection->send_ready_m.lock();
-                connection->send_ready.insert(data->tag);
+                connection->send_ready.insert(std::make_pair(data->tag, data->worker_id));
                 connection->send_ready_m.unlock();
             }
         }

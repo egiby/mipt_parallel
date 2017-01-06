@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 
 using std::cerr;
 
@@ -247,19 +248,11 @@ void play(IConnectionClient * connection, int argc, char ** argv)
     //~ std::cerr << "calculating ended\n";
     // answering
 
-    //~ for (int x = 0; x < size; ++x)
-    //~ {
-        //~ for (int y = 0; y < m; ++y)
-        //~ {
-            //~ std::cerr << thread_board[x * m + y];
-        //~ }
-        //~ std::cerr << '\n';
-    //~ }
-    
     if (thread_idx != 0)
     {
-        //~ std::cerr << thread_idx << " send\n";
-        connection->send(thread_board, size * m, 0, thread_idx + 25000);
+        IRequest * request = connection->async_send(thread_board, size * m, 0, thread_idx + 25000);
+        
+        request->wait();
     }
     else
     {
@@ -279,14 +272,22 @@ void play(IConnectionClient * connection, int argc, char ** argv)
             last += count_r[i];
         }
         
+        std::vector<IRequest*> r;
+        
         for (int i = 1; i < num_threads; ++i)
         {
-            //~ cerr << i << " recved\n";
-            connection->recv(line_board + disp_r[i], count_r[i], i, i + 25000);
+            r.push_back(connection->async_recv(line_board + disp_r[i], count_r[i], i, i + 25000));
         }
         
         memcpy(line_board, thread_board, size * m * sizeof(int));
+        
+        //~ perror("wait all");
+        
+        for (int i = 0; i < (int)r.size(); ++i)
+            r[i]->wait();
         // printing
+        
+        //~ cerr << "wait all\n";
         
         Board * board = get_board_from_line(line_board, n, m);
         
@@ -304,5 +305,6 @@ void play(IConnectionClient * connection, int argc, char ** argv)
     free(thread_board);
     free(new_board);
     
+    //~ cerr << "finalized\n";
     connection->finalize();
 }
