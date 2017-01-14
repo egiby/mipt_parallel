@@ -32,10 +32,11 @@ char check(const char * message, int err, char is_exit)
 {
     if (err != 0)
     {
-        perror(message);
-        
         if (is_exit)
+        {
+            perror(message);
             exit(err);
+        }
         else
         {
             errno = 0;
@@ -467,7 +468,8 @@ void init_connection(int worker_id, SocketsConnectionClient * connection)
 
 bool send_int(int fd, int &cur_size, int * start)
 {
-    cur_size += send(fd, start + cur_size, sizeof(int) - cur_size, MSG_DONTWAIT);
+    //~ cur_size += send(fd, start + cur_size, sizeof(int) - cur_size, MSG_DONTWAIT);
+    cur_size += send(fd, start + cur_size, sizeof(int) - cur_size, 0);
     if (errno == EAGAIN || errno == EWOULDBLOCK)
     {
         errno = 0;
@@ -494,7 +496,8 @@ void send_part(DataForSend * data, SocketsConnectionClient * connection)
         if (!send_int(fd, data->cur_expected_size, &(data->expected_size)))
             return;
     
-    data->cur_size += send(fd, data->data + data->cur_size, data->expected_size - data->cur_size, MSG_DONTWAIT);
+    //~ data->cur_size += send(fd, data->data + data->cur_size, data->expected_size - data->cur_size, MSG_DONTWAIT);
+    data->cur_size += send(fd, data->data + data->cur_size, data->expected_size - data->cur_size, 0);
     if (errno == EAGAIN || errno == EWOULDBLOCK)
     {
         errno = 0;

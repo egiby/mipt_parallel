@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <chrono>
 
 using std::cerr;
 
@@ -41,7 +42,12 @@ Board * get_board_from_line(int * line_board, int n, int m)
 int get_line_board_elem(int * board, int * top, int * bottom, int x, int y, int size, int m)
 {
     int ans = -1;
-    y = (y + m) % m;
+    
+    if (y < 0)
+        y += m;
+    
+    if (y >= m)
+        y -= m;
     
     if (x == -1)
         ans = top[y];
@@ -148,6 +154,8 @@ void play(IConnectionClient * connection, int argc, char ** argv)
     int size;
     char is_reversed = 0;
     
+    std::chrono::time_point<std::chrono::system_clock> start_time = std::chrono::system_clock::now();
+    
     // reading
     if (thread_idx == 0)
     {
@@ -211,6 +219,8 @@ void play(IConnectionClient * connection, int argc, char ** argv)
         //~ }
         //~ std::cerr << '\n';
     //~ }
+    
+    
     
     //~ std::cerr << "calculating started\n";
     
@@ -305,6 +315,11 @@ void play(IConnectionClient * connection, int argc, char ** argv)
     free(thread_board);
     free(new_board);
     
+    if (thread_idx == 0)
+    {
+        std::chrono::time_point<std::chrono::system_clock> end_time = std::chrono::system_clock::now();
+        std::cerr << num_threads << ' ' << std::chrono::duration<double>(end_time - start_time).count() << '\n';
+    }
     //~ cerr << "finalized\n";
     connection->finalize();
 }

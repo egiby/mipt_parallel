@@ -36,7 +36,7 @@ int main(int argc, char ** argv)
     
     Board * new_board = get_board(n, m);
     for (int i = 0; i < k; ++i)
-#pragma omp parallel num_threads(num_threads) shared(board, new_board, n, m)
+#pragma omp parallel num_threads(num_threads)
     {
     #pragma omp barrier
         int left = calc_left(n, omp_get_thread_num(), omp_get_num_threads());
